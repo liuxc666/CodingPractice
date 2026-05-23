@@ -1,0 +1,14 @@
+#目标
+int32 target[]
+string item_name
+
+---
+#结果
+bool is_finish
+int32 total_duration
+
+---
+#回报
+string current_mode
+int32 current_coordinates
+int32 remaining_power
