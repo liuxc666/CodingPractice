@@ -29,6 +29,10 @@ private:
             RCLCPP_INFO(this->get_logger(), 
             "收到命令！目标位置：[ %i , %i ],需要运送的物品：%s",
             target_x,target_y,item_name.c_str());
+
+            goal_queue_.push(goal);//将goal完整的放进容器
+
+            RCLCPP_INFO(this->get_logger(),"已将目标储存进队列中")
             return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
         }else{
             RCLCPP_INFO(this->get_logger(), "坐标无效，请重新输入");
@@ -38,11 +42,52 @@ private:
     }
 
     rclcpp_action::CancelResponse handle_cancel(
-		const std::shared_ptr<GoalHandleCleanShrine> goal_handle 
+		const std::shared_ptr<GoalHandleRobotMsg> goal_handle 
 	){
     	RCLCPP_INFO(this->get_logger(), "收到指令，回到吧台，清除所有任务");
-    	return rclcpp_action::CancelResponse::ACCEPT; // 同意取消
+        goal_queue_ = queue<int>();
+        return rclcpp_action::CancelResponse::ACCEPT; // 同意取消
 	}
+
+    
+	void handle_accepted(const std::shared_ptr<GoalHandleRobotMsg> goal_handle){
+
+		std::thread{
+			[this,goal_handle](){this->start_delivering_alcohol(goal_handle);}
+		}.detach();
+		 
+	}
+
+    void start_delivering_alcohol(const std::shared_ptr<GoalHandleRobotMsg> goal_handle){
+        RCLCPP_INFO(this->get_logger(), "送酒任务开始");
+        //goal信息
+        int target_x;
+        int target_y;
+        std::string item_name;
+
+        //feedback信息
+        std::string current_mode;
+        int current_coordinates;
+        int remaining_power;
+
+        //result信息
+        bool is_finish;
+        int total_duration;
+
+        //使用枚举控制状态机状态
+        enum RobotMode{
+            Idle,
+            Delivering,
+            LowBattery,
+            Charging
+        }
+
+        RobotMode robot_status = Idle;
+
+
+    }
+
+
 public:
     RobotBartenderNode() : Node("robot_bartender_node"){
         server_ = rclcpp_action::create_server<RobotMsg>(
