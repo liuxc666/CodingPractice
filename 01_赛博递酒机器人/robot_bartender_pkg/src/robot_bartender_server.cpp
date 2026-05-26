@@ -25,7 +25,7 @@ private:
         std::string item_name = goal->item_name;
         //获取目标信息
 
-        if(target_x <= 15 and target_y <= 15){
+        if(target_x <= 7 and target_y <= 7){
             RCLCPP_INFO(this->get_logger(), 
             "收到命令！目标位置：[ %i , %i ],需要运送的物品：%s",
             target_x,target_y,item_name.c_str());
@@ -44,8 +44,8 @@ private:
     rclcpp_action::CancelResponse handle_cancel(
 		const std::shared_ptr<GoalHandleRobotMsg> goal_handle 
 	){
-    	RCLCPP_INFO(this->get_logger(), "收到指令，回到吧台，清除所有任务");
-        goal_queue_ = queue<int>();
+    	RCLCPP_INFO(this->get_logger(), "收到指令，回到吧台，清除所有任务,进入休眠状态");
+        goal_queue_ = queue<std::shared_ptr<RobotMsg::Goal>>();
         return rclcpp_action::CancelResponse::ACCEPT; // 同意取消
 	}
 
@@ -60,10 +60,13 @@ private:
 
     void start_delivering_alcohol(const std::shared_ptr<GoalHandleRobotMsg> goal_handle){
         RCLCPP_INFO(this->get_logger(), "送酒任务开始");
+        
+        auto goal_data = goal_queue_.front();
+
         //goal信息
-        int target_x;
-        int target_y;
-        std::string item_name;
+        int target_x = goal_data->target_x;
+        int target_y = goal_data->target_y;
+        std::string item_name = goal_data->item_name;
 
         //feedback信息
         std::string current_mode;
@@ -80,7 +83,7 @@ private:
             Delivering,
             LowBattery,
             Charging
-        }
+        };
 
         RobotMode robot_status = Idle;
 
