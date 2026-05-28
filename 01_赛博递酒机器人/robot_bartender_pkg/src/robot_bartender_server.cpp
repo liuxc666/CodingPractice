@@ -26,7 +26,7 @@ private:
         std::string item_name = goal->item_name;
         //获取目标信息
 
-        if(target_x <= 7 and target_y <= 7){
+        if(target_x <= 10 and target_y <= 10){
             RCLCPP_INFO(this->get_logger(), 
             "收到命令！目标位置：[ %i , %i ],需要运送的物品：%s",
             target_x,target_y,item_name.c_str());
@@ -102,7 +102,29 @@ private:
             
             //判断当前状态
             RobotMode robot_status = (remaining_power <= 20) ? LowBattery : Delivering;
+            //电量小于等于20时，状态为LowBattery模式
             target_x = (RobotMode robot_status = Delivering) ? target_x : 0;
+            target_y = (RobotMode robot_status = Delivering) ? target_y : 0;
+            //机器人状态为delivering时，目标坐标为goal中的坐标，否则为0
+        
+            //运动算法
+            double dx = target_x - current_x; //剩余距离
+            double dy = target_y - current_y;
+            double distance = std::sqrt( dx*dx + dy*dy); //斜边长度
+
+            double step = (robot_status = LowBattery) ? 3.0 : 1.0;
+
+            if(distance <= step){
+                current_x = target_x;
+                current_y = target_y;
+                //防止走过头
+                //抵达目标点
+            }else{
+                current_x += (step/distance) * dx;
+                current_y += (step/distance) * dy;
+                //传递中
+            }
+
 
         }
 
