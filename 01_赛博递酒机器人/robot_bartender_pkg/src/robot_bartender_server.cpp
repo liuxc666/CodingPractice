@@ -80,6 +80,9 @@ private:
             Charging
         };
 
+        bool can_get_goal = true;
+        //创建一个控制目标读取的bool
+
         RobotMode robot_status = Idle;
 
         //队列不是空，则循环
@@ -93,38 +96,65 @@ private:
                 return; 
             }
 
-            auto goal_data = goal_queue_.front();
-            //将队列首位塞入变量
-            //提取goal信息
-            int target_x = goal_data->target_x;
-            int target_y = goal_data->target_y;
-            std::string item_name = goal_data->item_name;
-            
-            //判断当前状态
-            RobotMode robot_status = (remaining_power <= 20) ? LowBattery : Delivering;
-            //电量小于等于20时，状态为LowBattery模式
-            target_x = (RobotMode robot_status = Delivering) ? target_x : 0;
-            target_y = (RobotMode robot_status = Delivering) ? target_y : 0;
-            //机器人状态为delivering时，目标坐标为goal中的坐标，否则为0
-        
-            //运动算法
-            double dx = target_x - current_x; //剩余距离
-            double dy = target_y - current_y;
-            double distance = std::sqrt( dx*dx + dy*dy); //斜边长度
-
-            double step = (robot_status = LowBattery) ? 3.0 : 1.0;
-
-            if(distance <= step){
-                current_x = target_x;
-                current_y = target_y;
-                //防止走过头
-                //抵达目标点
-            }else{
-                current_x += (step/distance) * dx;
-                current_y += (step/distance) * dy;
-                //传递中
+            if(robot_status == Idle and can_get_goal){
+                can_get_goal = false;
+                //先将读取模式关闭
+                auto goal_data = goal_queue_.front();
+                //将队列首位塞入变量
+                //提取goal信息
+                int target_x = goal_data->target_x;
+                int target_y = goal_data->target_y;
+                std::string item_name = goal_data->item_name;
+                
+                auto goal_data = goal_queue_.pop();
+                //提取数据后删除
             }
+            
+            if( ! robot_status == Charging){
+                //工作模式
 
+                //判断当前状态
+                robot_status = (remaining_power <= 20) ? LowBattery : Delivering;
+                //电量小于等于20时，状态为LowBattery模式
+                feedback->current_mode = (remaining_power <= 20) ? "LowBattery" : "Delivering";
+                //发送当前状态
+
+                target_x = (robot_status == Delivering) ? target_x : 0;
+                target_y = (robot_status == Delivering) ? target_y : 0;
+                feedback->target_x = target_x;
+                feedback->target_y = target_y;
+                //机器人状态为delivering时，目标坐标为goal中的坐标，否则为0点
+            
+                //运动算法
+                double dx = target_x - current_x; //剩余距离
+                double dy = target_y - current_y;
+                double distance = std::sqrt( dx*dx + dy*dy); //斜边长度
+
+                double step = (robot_status = LowBattery) ? 3.0 : 1.0;
+
+                if(distance <= step){
+                    current_x = target_x;
+                    current_y = target_y;
+                    //防止走过头
+                    //抵达目标点
+
+                    robot_status = (robot_status == LowBattery) ? Charging : Delivering;
+                    //如果是低电量模式到达了目标点，则将状态改为充电模式
+                    feedback->current_mode = (robot_status == LowBattery) ? "Charging" : "Delivering";
+
+                }else{
+                    current_x += (step/distance) * dx;
+                    current_y += (step/distance) * dy;
+                    //传递中
+                }
+                //在运动模块结束后回报当前状态
+                feedback->current_x = current_x;
+                feedback->current_y = current_y;
+                feedback->remaining_power = remaining_power;
+
+            }else{
+                //充电模式
+            }
 
         }
 
