@@ -105,7 +105,9 @@ private:
                 int target_x = goal_data->target_x;
                 int target_y = goal_data->target_y;
                 std::string item_name = goal_data->item_name;
-                
+                RCLCPP_INFO(this->get_logger(), "成功接到目标，目标信息：[ %s ]( %i , %i )",
+                                                            item_name.c_str(), target_x,target_y);
+
                 auto goal_data = goal_queue_.pop();
                 //提取数据后删除
             }
@@ -121,15 +123,14 @@ private:
 
                 target_x = (robot_status == Delivering) ? target_x : 0;
                 target_y = (robot_status == Delivering) ? target_y : 0;
-                feedback->target_x = target_x;
-                feedback->target_y = target_y;
                 //机器人状态为delivering时，目标坐标为goal中的坐标，否则为0点
             
                 //运动算法
-                double dx = target_x - current_x; //剩余距离
-                double dy = target_y - current_y;
-                double distance = std::sqrt( dx*dx + dy*dy); //斜边长度
+                double dx = std::fabs(target_x - current_x); //剩余距离
+                double dy = std::fabs(target_y - current_y);
+                //取绝对值，为了求平方根做准备
 
+                double distance =std::sqrt( dx*dx + dy*dy); //斜边长度
                 double step = (robot_status = LowBattery) ? 3.0 : 1.0;
 
                 if(distance <= step){
@@ -141,11 +142,22 @@ private:
                     robot_status = (robot_status == LowBattery) ? Charging : Delivering;
                     //如果是低电量模式到达了目标点，则将状态改为充电模式
                     feedback->current_mode = (robot_status == LowBattery) ? "Charging" : "Delivering";
-
+                    RCLCPP_INFO(this->get_logger(), "当前模式为 %s ",feedback->current_mode.c_str());
+                    if(robot_status == Delivering){ //送货成功
+                        RCLCPP_INFO(this->get_logger(), "成功将酒送到指定位置");
+                        is_finish = true;
+                        robot_status == Idle; //将状态设置为空闲
+                        can_get_goal = true; //可以获取下一个目标了
+                        RCLCPP_INFO(this->get_logger(), "准备接取下一个目标");
+                        result->total_duration += total_duration;
+                        result->is_finish = true;
+                    }
                 }else{
-                    current_x += (step/distance) * dx;
-                    current_y += (step/distance) * dy;
-                    //传递中
+                    current_x = (robot_status == Delivering) ? 
+                    current_x + (step/distance) * dx : current_x - (step/distance) * dx;
+                    //如果以0点为目标，则当前坐标大于目标坐标，所以需要判断加减
+                    current_y = (robot_status == Delivering) ? 
+                    current_y + (step/distance) * dy : current_y - (step/distance) * dy;
                 }
                 //在运动模块结束后回报当前状态
                 feedback->current_x = current_x;
@@ -156,6 +168,9 @@ private:
                 //充电模式
             }
 
+            //这一步走完后，电量-5% ，时间+1
+            remaining_power -= 5;
+            total_duration += 1;
         }
 
         //成功完成任务
